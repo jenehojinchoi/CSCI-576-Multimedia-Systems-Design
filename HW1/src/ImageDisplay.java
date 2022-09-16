@@ -7,10 +7,13 @@ import javax.swing.*;
 
 public class ImageDisplay {
 
-    JFrame frame;
-    JLabel lbIm1;
-    BufferedImage imgOne;
-    BufferedImage processedImg;
+
+    JFrame frame1; // original
+    JFrame frame2; // processed
+    JLabel lbIm1; // original
+    JLabel lbIm2; // processed
+    BufferedImage original_image;
+    BufferedImage processed_image;
     int width = 1920; // default image width and height
     int height = 1080;
 
@@ -21,7 +24,7 @@ public class ImageDisplay {
     /** Read Image RGB
      *  Reads the image of given width and height at the given imgPath into the provided BufferedImage.
      */
-    private void readImageRGB(int width, int height, String imgPath, BufferedImage img)
+    private void readImageRGB(int width, int height, String imgPath)
     {
         try
         {
@@ -41,6 +44,7 @@ public class ImageDisplay {
             {
                 for(int x = 0; x < width; x++)
                 {
+                    // why needed?
                     byte a = 0;
                     byte r = bytes[ind];
                     byte g = bytes[ind+height*width];
@@ -48,21 +52,28 @@ public class ImageDisplay {
 
                     int pix = 0xff000000 | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
                     //int pix = ((a << 24) + (r << 16) + (g << 8) + b);
-                    img.setRGB(x,y,pix);
+                    original_image.setRGB(x,y,pix);
                     ind++;
                 }
             }
 
             // ADDED: convert to YUV
-            int[][] givenYUV = convertToYUV(bytes, width, height);
+            double[][] givenYUV = convert_to_YUV(bytes, width, height);
 
             // ADDED: subsampling
-            int[][] subSampledYUV = subSample(givenYUV, this.Y_input, this.U_input, this.V_input, width, height);
+            double[][] subSampled_YUV = subSample(givenYUV, this.Y_input, this.U_input, this.V_input, width, height);
+
+            // ADDED: upsampling
+            double[][] upSampled_YUV = upSample(subSampled_YUV, width, height);
 
             // ADDED: convert to RGB
             // have to put upsampled YUV
             // but for now, to test if convertToRGB works, i'm using givenYUV as an input
-            int[][] backToRGB = convertToRGB(givenYUV, width, height);
+            int[][] backToRGB = convert_to_RGB(upSampled_YUV, width, height);
+
+            // next processing
+            // backToRGB -> /Sw /Sh -> new_width = width * sw -> processed_image
+            // antialiasing -> take average of all 9 backToRGB ->  /Sw /Sh
 
             // ADDED: image creation
             //subSampledImageCreation
@@ -72,7 +83,7 @@ public class ImageDisplay {
                 for(int x = 0; x < width; x++)
                 {
                     int pix = 0xff000000 | (backToRGB[0][ind] << 16) | (backToRGB[1][ind] << 8) | backToRGB[2][ind];
-                    this.processedImg.setRGB(x,y,pix);
+                    processed_image.setRGB(x,y,pix);
                     ind++;
                 }
             }
@@ -98,21 +109,25 @@ public class ImageDisplay {
         this.V_input = Integer.parseInt(args[3]);
 
         // Read in the specified image
-        imgOne = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        original_image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
         // ADDED
         // create a processed image
-        processedImg = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        processed_image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
-        readImageRGB(width, height, args[0], imgOne);
+        readImageRGB(width, height, args[0]);
 
 
         // Use label to display the image
-        frame = new JFrame();
-        GridBagLayout gLayout = new GridBagLayout();
-        frame.getContentPane().setLayout(gLayout);
+        // show original image
+        frame1 = new JFrame();
+        GridBagLayout gLayout1 = new GridBagLayout();
+        frame1.getContentPane().setLayout(gLayout1);
 
-        lbIm1 = new JLabel(new ImageIcon(imgOne));
+        lbIm1 = new JLabel(new ImageIcon(original_image));
+
+        JLabel lbText1 = new JLabel("Original image");
+        lbText1.setHorizontalAlignment(SwingConstants.CENTER);
 
         GridBagConstraints c = new GridBagConstraints();
         c.fill = GridBagConstraints.HORIZONTAL;
@@ -120,28 +135,54 @@ public class ImageDisplay {
         c.weightx = 0.5;
         c.gridx = 0;
         c.gridy = 0;
+        frame1.getContentPane().add(lbText1, c);
 
         c.fill = GridBagConstraints.HORIZONTAL;
         c.gridx = 0;
         c.gridy = 1;
-        frame.getContentPane().add(lbIm1, c);
+        frame1.getContentPane().add(lbIm1, c);
 
-        frame.pack();
-        frame.setVisible(true);
+        frame1.pack();
+        frame1.setVisible(true);
+
+
+        // show original image
+        frame2 = new JFrame();
+        GridBagLayout gLayout2 = new GridBagLayout();
+        frame2.getContentPane().setLayout(gLayout2);
+
+        lbIm2 = new JLabel(new ImageIcon(processed_image));
+        JLabel lbText2 = new JLabel("Processed image after subsampling");
+        lbText2.setHorizontalAlignment(SwingConstants.CENTER);
+
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.anchor = GridBagConstraints.CENTER;
+        c.weightx = 0.5;
+        c.gridx = 0;
+        c.gridy = 0;
+        frame2.getContentPane().add(lbText2, c);
+
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.gridx = 0;
+        c.gridy = 1;
+        frame2.getContentPane().add(lbIm2, c);
+
+        frame2.pack();
+        frame2.setVisible(true);
     }
 
-    private int[][] convertToYUV(byte[] rgb, int width,int height){
-        int[][] yuv = new int[3][rgb.length/3];
+    private double[][] convert_to_YUV(byte[] rgb, int width,int height){
+        double[][] yuv = new double[3][rgb.length/3];
         int index = 0;
-        for(int p = 0; p < height; p++){
-            for(int q = 0; q < width; q++){
+        for (int p = 0; p < height; p++) {
+            for (int q = 0; q < width; q++) {
                 int r = Byte.toUnsignedInt(rgb[index]);
                 int g = Byte.toUnsignedInt(rgb[index+height*width]);
                 int b = Byte.toUnsignedInt(rgb[index+height*width*2]);
 
-                int y = Math.round((float)(0.299*r + 0.587*g + 0.114*b));
-                int u = Math.round((float)(0.596*r - 0.274*g - 0.322*b));
-                int v = Math.round((float)(0.211*r - 0.523*g + 0.312*b));
+                double y = (float)(0.299 * r + 0.587 * g + 0.114 * b);
+                double u = (float)(0.596 * r - 0.274 * g - 0.322 * b);
+                double v = (float)(0.211 * r - 0.523 * g + 0.312 * b);
 
                 yuv[0][index] = y;
                 yuv[1][index] = u;
@@ -152,44 +193,96 @@ public class ImageDisplay {
         return yuv;
     }
 
-    private int[][] subSample(int[][] givenYUV, int y_input, int u_input, int v_input, int width, int height){
-        int[][] subSampled_YUV = new int[3][givenYUV[0].length];
+    private int[][] convert_to_RGB(double[][] yuv, int width, int height){
+        int[][] processed_rgb = new int[3][yuv[0].length];
+        int ind = 0;
+        for (int p = 0; p < height; p++) {
+            for (int q = 0; q < width; q++) {
+                double y = yuv[0][ind];
+                double u = yuv[1][ind];
+                double v = yuv[2][ind];
+
+                int r = Math.round((float)(1.000 * y + 0.956 * u + 0.621 * v));
+                int g = Math.round((float)(1.000 * y - 0.272 * u - 0.647 * v));
+                int b = Math.round((float)(1.000 * y - 1.106 * u + 1.703 * v));
+
+                // if bigger than 255, change it to 0
+                processed_rgb[0][ind] = r >= 0 ? r : 0;
+                processed_rgb[1][ind] = g >= 0 ? g : 0;
+                processed_rgb[2][ind] = b >= 0 ? b : 0;
+                ind++;
+            }
+        }
+        return processed_rgb;
+    }
+
+    private double[][] subSample(double[][] givenYUV, int y_input, int u_input, int v_input, int width, int height){
+        double[][] subSampled_YUV = new double[3][givenYUV[0].length];
         int index = 0;
         for(int p = 0; p < height; p++)
         {
             for(int q = 0; q < width; q++)
             {
-                subSampled_YUV[0][index] = q % y_input == 0 ? givenYUV[0][index] : Integer.MIN_VALUE;
-                subSampled_YUV[1][index] = q % u_input == 0 ? givenYUV[1][index] : Integer.MIN_VALUE;
-                subSampled_YUV[2][index] = q % v_input == 0 ? givenYUV[2][index] : Integer.MIN_VALUE;
+                double[] Y_subSampled = subSampled_YUV[0];
+                double[] U_subSampled = subSampled_YUV[1];
+                double[] V_subSampled = subSampled_YUV[2];
+
+                Y_subSampled[index] = q % y_input == 0 ? givenYUV[0][index] : Integer.MIN_VALUE;
+                U_subSampled[index] = q % u_input == 0 ? givenYUV[1][index] : Integer.MIN_VALUE;
+                V_subSampled[index] = q % v_input == 0 ? givenYUV[2][index] : Integer.MIN_VALUE;
                 index++;
             }
         }
         return subSampled_YUV;
     }
 
-    private int[][] convertToRGB(int[][] yuv, int width, int height){
-        int[][] rgb = new int[3][yuv[0].length];
-        int ind = 0;
-        for(int p = 0; p < height; p++)
-        {
-            for(int q = 0; q < width; q++)
-            {
-                int y = yuv[0][ind];
-                int u = yuv[1][ind];
-                int v = yuv[2][ind];
+    private double[][] upSample(double[][] subSampled_YUV, int width, int height){
+        double[][] upSampled_YUV = new double[3][subSampled_YUV[0].length];
+        int index = 0;
+        for (int p = 0; p < height; p++) {
+            for (int q = 0; q < width; q++) {
+                double[] Y_upSampled = upSampled_YUV[0];
+                double[] U_upSampled = upSampled_YUV[1];
+                double[] V_upSampled = upSampled_YUV[2];
 
-                int r = Math.round((float)(1.000 * y + 0.956 * u + 0.621 * v));
-                int g = Math.round((float)(1.000 * y - 0.272 * u - 0.647 * v));
-                int b = Math.round((float)(1.000 * y - 1.106 * u + 1.703 * v));
-
-                rgb[0][ind] = r>=0?r:0;
-                rgb[1][ind] = g>=0?g:0;
-                rgb[2][ind] = b>=0?b:0;
-                ind++;
+                Y_upSampled[index] = subSampled_YUV[0][index] != Integer.MIN_VALUE ? subSampled_YUV[0][index] : get_Average(subSampled_YUV[0], index);
+                U_upSampled[index] = subSampled_YUV[1][index] != Integer.MIN_VALUE ? subSampled_YUV[1][index] : get_Average(subSampled_YUV[1], index);
+                V_upSampled[index] = subSampled_YUV[2][index] != Integer.MIN_VALUE ? subSampled_YUV[2][index] : get_Average(subSampled_YUV[2], index);
+                index++;
             }
         }
-        return rgb;
+        return upSampled_YUV;
+    }
+
+    private double get_Average(double[] arr, int index){
+        double previous = Integer.MIN_VALUE;
+        double next = Integer.MIN_VALUE;
+
+        for (int i = index; i >= 0; --i) {
+            if (arr[i] != Integer.MIN_VALUE) {
+                previous = arr[i];
+                break;
+            }
+        }
+        for (int i = index; i <arr.length; ++i) {
+            if (arr[i] != Integer.MIN_VALUE) {
+                next = arr[i];
+                break;
+            }
+        }
+
+        // if prev and next both exists
+        if (previous != Integer.MIN_VALUE&& next != Integer.MIN_VALUE) {
+            return (previous + next)/2;
+        }
+        // if only prev exists
+        else if (previous != Integer.MIN_VALUE) {
+            return previous;
+        }
+        // if only next exists
+        else {
+            return next;
+        }
     }
 
     public static void main(String[] args) {
