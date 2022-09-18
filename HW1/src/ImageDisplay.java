@@ -73,6 +73,10 @@ public class ImageDisplay {
 
             // next processing
             // backToRGB -> /Sw /Sh -> new_width = width * sw -> processed_image
+            // int[][] scaled_RGB = scale(backToRGB)
+
+
+
             // antialiasing -> take average of all 9 backToRGB ->  /Sw /Sh
 
             // ADDED: image creation
@@ -180,9 +184,9 @@ public class ImageDisplay {
                 int g = Byte.toUnsignedInt(rgb[index+height*width]);
                 int b = Byte.toUnsignedInt(rgb[index+height*width*2]);
 
-                double y = (float)(0.299 * r + 0.587 * g + 0.114 * b);
-                double u = (float)(0.596 * r - 0.274 * g - 0.322 * b);
-                double v = (float)(0.211 * r - 0.523 * g + 0.312 * b);
+                double y = (0.299 * r + 0.587 * g + 0.114 * b);
+                double u = (0.596 * r - 0.274 * g - 0.322 * b);
+                double v = (0.211 * r - 0.523 * g + 0.312 * b);
 
                 yuv[0][index] = y;
                 yuv[1][index] = u;
@@ -206,10 +210,15 @@ public class ImageDisplay {
                 int g = Math.round((float)(1.000 * y - 0.272 * u - 0.647 * v));
                 int b = Math.round((float)(1.000 * y - 1.106 * u + 1.703 * v));
 
-                // if bigger than 255, change it to 0
-                processed_rgb[0][ind] = r >= 0 ? r : 0;
-                processed_rgb[1][ind] = g >= 0 ? g : 0;
-                processed_rgb[2][ind] = b >= 0 ? b : 0;
+                // clip values into [0,255]
+                processed_rgb[0][ind] = Math.max(r, 0);
+                processed_rgb[1][ind] = Math.max(g, 0);
+                processed_rgb[2][ind] = Math.max(b, 0);
+
+                processed_rgb[0][ind] = Math.min(processed_rgb[0][ind], 255);
+                processed_rgb[1][ind] = Math.min(processed_rgb[1][ind], 255);
+                processed_rgb[2][ind] = Math.min(processed_rgb[2][ind], 255);
+
                 ind++;
             }
         }
@@ -230,6 +239,7 @@ public class ImageDisplay {
                 Y_subSampled[index] = q % y_input == 0 ? givenYUV[0][index] : Integer.MIN_VALUE;
                 U_subSampled[index] = q % u_input == 0 ? givenYUV[1][index] : Integer.MIN_VALUE;
                 V_subSampled[index] = q % v_input == 0 ? givenYUV[2][index] : Integer.MIN_VALUE;
+
                 index++;
             }
         }
@@ -245,9 +255,24 @@ public class ImageDisplay {
                 double[] U_upSampled = upSampled_YUV[1];
                 double[] V_upSampled = upSampled_YUV[2];
 
-                Y_upSampled[index] = subSampled_YUV[0][index] != Integer.MIN_VALUE ? subSampled_YUV[0][index] : get_Average(subSampled_YUV[0], index);
-                U_upSampled[index] = subSampled_YUV[1][index] != Integer.MIN_VALUE ? subSampled_YUV[1][index] : get_Average(subSampled_YUV[1], index);
-                V_upSampled[index] = subSampled_YUV[2][index] != Integer.MIN_VALUE ? subSampled_YUV[2][index] : get_Average(subSampled_YUV[2], index);
+                // if no value, get average.
+                if (subSampled_YUV[0][index] == Integer.MIN_VALUE) {
+                    Y_upSampled[index] = get_Average(subSampled_YUV[0], index);
+                } else {
+                    Y_upSampled[index] = subSampled_YUV[0][index];
+                }
+
+                if (subSampled_YUV[1][index] == Integer.MIN_VALUE) {
+                    U_upSampled[index] = get_Average(subSampled_YUV[1], index);
+                } else {
+                    U_upSampled[index] = subSampled_YUV[1][index];
+                }
+
+                if (subSampled_YUV[2][index] == Integer.MIN_VALUE) {
+                    V_upSampled[index] = get_Average(subSampled_YUV[2], index);
+                } else {
+                    V_upSampled[index] = subSampled_YUV[2][index];
+                }
                 index++;
             }
         }
@@ -264,15 +289,16 @@ public class ImageDisplay {
                 break;
             }
         }
-        for (int i = index; i <arr.length; ++i) {
+        for (int i = index; i < arr.length; ++i) {
             if (arr[i] != Integer.MIN_VALUE) {
                 next = arr[i];
                 break;
             }
         }
 
+        // upsampling for values that are empty
         // if prev and next both exists
-        if (previous != Integer.MIN_VALUE&& next != Integer.MIN_VALUE) {
+        if (previous != Integer.MIN_VALUE && next != Integer.MIN_VALUE) {
             return (previous + next)/2;
         }
         // if only prev exists
@@ -284,6 +310,7 @@ public class ImageDisplay {
             return next;
         }
     }
+
 
     public static void main(String[] args) {
         ImageDisplay ren = new ImageDisplay();
