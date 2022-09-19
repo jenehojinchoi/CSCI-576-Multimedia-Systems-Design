@@ -154,7 +154,7 @@ public class ImageDisplay {
         frame1.pack();
         frame1.setVisible(true);
 
-        // show original image
+        // show processed image in a different window
         frame2 = new JFrame();
         GridBagLayout gLayout2 = new GridBagLayout();
         frame2.getContentPane().setLayout(gLayout2);
