@@ -160,7 +160,7 @@ public class ImageDisplay {
         frame2.getContentPane().setLayout(gLayout2);
 
         lbIm2 = new JLabel(new ImageIcon(processed_image));
-        JLabel lbText2 = new JLabel("Processed image after subsampling");
+        JLabel lbText2 = new JLabel("Processed image");
         lbText2.setHorizontalAlignment(SwingConstants.CENTER);
 
         c.fill = GridBagConstraints.HORIZONTAL;
