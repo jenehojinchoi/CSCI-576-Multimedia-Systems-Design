@@ -26,6 +26,8 @@ public class ImageDisplay {
     double Sw_input;
     double Sh_input;
 
+    int A_input;
+
     /** Read Image RGB
      *  Reads the image of given width and height at the given imgPath into the provided BufferedImage.
      */
@@ -62,27 +64,26 @@ public class ImageDisplay {
                 }
             }
 
-            // ADDED: convert to YUV
+            // convert to YUV
             double[][] givenYUV = convert_to_YUV(bytes, width, height);
 
-            // ADDED: subsampling
+            // subsampling
             double[][] subSampled_YUV = subSample(givenYUV, this.Y_input, this.U_input, this.V_input, width, height);
 
-            // ADDED: upsampling
+            // upsampling
             double[][] upSampled_YUV = upSample(subSampled_YUV, width, height);
 
-            // ADDED: convert to RGB
-            // have to put upsampled YUV
-            // but for now, to test if convertToRGB works, i'm using givenYUV as an input
-            int[][] backToRGB = convert_to_RGB(upSampled_YUV, width, height);
+            // convert back to RGB
+            int[][] coverted_RGB = convert_to_RGB(upSampled_YUV, width, height);
 
-            // next processing
-            // backToRGB -> /Sw /Sh -> new_width = width * sw -> processed_image
-            int[][] scaled_RGB = scale_RGB(backToRGB);
+            // scaling
+            int[][] scaled_RGB = scale_RGB(coverted_RGB);
 
-            // antialiasing -> take average of all 9 backToRGB ->  /Sw /Sh
+            // if A_input is 1, do antialiasing
+            if (A_input == 1) {
+                scaled_RGB = antiAlias_RGB(scaled_RGB);
+            }
 
-            // ADDED: image creation
             //subSampledImageCreation
             ind = 0;
             for(int y = 0; y < scaled_height; y++)
@@ -94,8 +95,6 @@ public class ImageDisplay {
                     ind++;
                 }
             }
-
-
         }
         catch (FileNotFoundException e)
         {
@@ -109,28 +108,26 @@ public class ImageDisplay {
 
     public void showIms(String[] args){
 
-        // ADDED
-        // Read a parameter from command line
+        // Read parameters from command line
         this.Y_input = Integer.parseInt(args[1]);
         this.U_input = Integer.parseInt(args[2]);
         this.V_input = Integer.parseInt(args[3]);
         this.Sw_input = Double.parseDouble(args[4]);
         this.Sh_input = Double.parseDouble(args[5]);
-//        this.A_input = Integer.parseInt(args[3]);
+        this.A_input = Integer.parseInt(args[6]);
 
         // Read in the specified image
+        // create an original image
         original_image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
-        // ADDED
         // create a processed image
         this.scaled_width = Math.round((float)(width * this.Sw_input));
         this.scaled_height = Math.round((float)(height * this.Sh_input));
         processed_image = new BufferedImage(scaled_width, scaled_height, BufferedImage.TYPE_INT_RGB);
 
+        // call readImageRGB
         readImageRGB(width, height, args[0]);
 
-
-        // Use label to display the image
         // show original image
         frame1 = new JFrame();
         GridBagLayout gLayout1 = new GridBagLayout();
@@ -184,7 +181,6 @@ public class ImageDisplay {
 
     private double[][] convert_to_YUV(byte[] rgb, int width,int height){
         double[][] yuv = new double[3][rgb.length/3];
-        System.out.println("original length " + rgb.length/3);
         int index = 0;
         for (int p = 0; p < height; p++) {
             for (int q = 0; q < width; q++) {
@@ -207,27 +203,27 @@ public class ImageDisplay {
 
     private int[][] convert_to_RGB(double[][] yuv, int width, int height){
         int[][] processed_rgb = new int[3][yuv[0].length];
-        int ind = 0;
+        int index = 0;
         for (int p = 0; p < height; p++) {
             for (int q = 0; q < width; q++) {
-                double y = yuv[0][ind];
-                double u = yuv[1][ind];
-                double v = yuv[2][ind];
+                double y = yuv[0][index];
+                double u = yuv[1][index];
+                double v = yuv[2][index];
 
                 int r = Math.round((float)(1.000 * y + 0.956 * u + 0.621 * v));
                 int g = Math.round((float)(1.000 * y - 0.272 * u - 0.647 * v));
                 int b = Math.round((float)(1.000 * y - 1.106 * u + 1.703 * v));
 
                 // clip values into [0,255]
-                processed_rgb[0][ind] = Math.max(r, 0);
-                processed_rgb[1][ind] = Math.max(g, 0);
-                processed_rgb[2][ind] = Math.max(b, 0);
+                processed_rgb[0][index] = Math.max(r, 0);
+                processed_rgb[1][index] = Math.max(g, 0);
+                processed_rgb[2][index] = Math.max(b, 0);
 
-                processed_rgb[0][ind] = Math.min(processed_rgb[0][ind], 255);
-                processed_rgb[1][ind] = Math.min(processed_rgb[1][ind], 255);
-                processed_rgb[2][ind] = Math.min(processed_rgb[2][ind], 255);
+                processed_rgb[0][index] = Math.min(processed_rgb[0][index], 255);
+                processed_rgb[1][index] = Math.min(processed_rgb[1][index], 255);
+                processed_rgb[2][index] = Math.min(processed_rgb[2][index], 255);
 
-                ind++;
+                index++;
             }
         }
         return processed_rgb;
@@ -244,10 +240,23 @@ public class ImageDisplay {
                 double[] U_subSampled = subSampled_YUV[1];
                 double[] V_subSampled = subSampled_YUV[2];
 
-                Y_subSampled[index] = q % y_input == 0 ? givenYUV[0][index] : Integer.MIN_VALUE;
-                U_subSampled[index] = q % u_input == 0 ? givenYUV[1][index] : Integer.MIN_VALUE;
-                V_subSampled[index] = q % v_input == 0 ? givenYUV[2][index] : Integer.MIN_VALUE;
+                if (q % y_input == 0) {
+                    Y_subSampled[index] = givenYUV[0][index];
+                } else {
+                    Y_subSampled[index] = Integer.MIN_VALUE;
+                }
 
+                if (q % u_input == 0) {
+                    U_subSampled[index] = givenYUV[1][index];
+                } else {
+                    U_subSampled[index] = Integer.MIN_VALUE;
+                }
+
+                if (q % v_input == 0) {
+                    V_subSampled[index] = givenYUV[2][index];
+                } else {
+                    V_subSampled[index] = Integer.MIN_VALUE;
+                }
                 index++;
             }
         }
@@ -329,8 +338,10 @@ public class ImageDisplay {
 
         for (int p = 0; p < scaled_height; p++){
             for (int q = 0; q < scaled_width; q++){
+                // map original_index to new_index
                 int new_index = Math.round((float)p*scaled_width+q);
                 int original_index = Math.round((float)(p*Sw_reverse)*width + q*Sh_reverse);
+
                 scaled_RGB[0][new_index] = given_RGB[0][original_index];
                 scaled_RGB[1][new_index] = given_RGB[1][original_index];
                 scaled_RGB[2][new_index] = given_RGB[2][original_index];
@@ -339,9 +350,40 @@ public class ImageDisplay {
         return scaled_RGB;
     }
 
+    private int[][] antiAlias_RGB(int [][] scaled_RGB) {
+        int [][] antiAliased_RGB = new int [3][scaled_width * scaled_height];
+
+        int index = 0;
+        for (int p = 0; p < scaled_height; p++){
+            for (int q = 0; q < scaled_width; q++){
+                antiAliased_RGB[0][index] = get_adjacent_values_average(scaled_RGB[0], p, q);
+                antiAliased_RGB[1][index] = get_adjacent_values_average(scaled_RGB[1], p, q);
+                antiAliased_RGB[2][index] = get_adjacent_values_average(scaled_RGB[2], p, q);
+                index++;
+            }
+        }
+        return antiAliased_RGB;
+    }
+
+    private int get_adjacent_values_average(int[] scaled_version, int p, int q) {
+        // if p, q are in range and has adjacent 8 values
+        if (p > 0 && p < scaled_height - 1 && q > 0 && q < scaled_width - 1) {
+            int sum = 0;
+            for (int j = p-1; j < p+2; j++) {
+                for (int i = q-1; i < q+2; i++) {
+                    sum += scaled_version[j*scaled_width+i];
+                }
+            }
+            return sum / 9;
+        }
+        // if p, q are corner values (no 8 adjacent values)
+        else {
+            return scaled_version[p*scaled_width+q];
+        }
+    }
+
     public static void main(String[] args) {
         ImageDisplay ren = new ImageDisplay();
         ren.showIms(args);
     }
-
 }
