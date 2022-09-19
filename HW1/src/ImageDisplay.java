@@ -366,20 +366,18 @@ public class ImageDisplay {
     }
 
     private int get_adjacent_values_average(int[] scaled_version, int p, int q) {
-        // if p, q are in range and has adjacent 8 values
-        if (p > 0 && p < scaled_height - 1 && q > 0 && q < scaled_width - 1) {
-            int sum = 0;
-            for (int j = p-1; j < p+2; j++) {
-                for (int i = q-1; i < q+2; i++) {
-                    sum += scaled_version[j*scaled_width+i];
+        int count = 0;
+        int sum = 0;
+        for (int j = p - 1; j < p + 2; j++) {
+            for (int i = q - 1; i < q + 2; i++) {
+                // only if it is in bound
+                if (j >= 0 && j < scaled_height && i >= 0 && i < scaled_width) {
+                    sum += scaled_version[j * scaled_width + i];
+                    count++;
                 }
             }
-            return sum / 9;
         }
-        // if p, q are corner values (no 8 adjacent values)
-        else {
-            return scaled_version[p*scaled_width+q];
-        }
+        return sum / count;
     }
 
     public static void main(String[] args) {
