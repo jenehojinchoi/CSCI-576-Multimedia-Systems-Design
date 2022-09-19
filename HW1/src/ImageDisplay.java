@@ -17,9 +17,14 @@ public class ImageDisplay {
     int width = 1920; // default image width and height
     int height = 1080;
 
+    int scaled_width = width;
+    int scaled_height = height;
+
     int Y_input;
     int U_input;
     int V_input;
+    double Sw_input;
+    double Sh_input;
 
     /** Read Image RGB
      *  Reads the image of given width and height at the given imgPath into the provided BufferedImage.
@@ -73,20 +78,18 @@ public class ImageDisplay {
 
             // next processing
             // backToRGB -> /Sw /Sh -> new_width = width * sw -> processed_image
-            // int[][] scaled_RGB = scale(backToRGB)
-
-
+            int[][] scaled_RGB = scale_RGB(backToRGB);
 
             // antialiasing -> take average of all 9 backToRGB ->  /Sw /Sh
 
             // ADDED: image creation
             //subSampledImageCreation
             ind = 0;
-            for(int y = 0; y < height; y++)
+            for(int y = 0; y < scaled_height; y++)
             {
-                for(int x = 0; x < width; x++)
+                for(int x = 0; x < scaled_width; x++)
                 {
-                    int pix = 0xff000000 | (backToRGB[0][ind] << 16) | (backToRGB[1][ind] << 8) | backToRGB[2][ind];
+                    int pix = 0xff000000 | (scaled_RGB[0][ind] << 16) | (scaled_RGB[1][ind] << 8) | scaled_RGB[2][ind];
                     processed_image.setRGB(x,y,pix);
                     ind++;
                 }
@@ -111,13 +114,18 @@ public class ImageDisplay {
         this.Y_input = Integer.parseInt(args[1]);
         this.U_input = Integer.parseInt(args[2]);
         this.V_input = Integer.parseInt(args[3]);
+        this.Sw_input = Double.parseDouble(args[4]);
+        this.Sh_input = Double.parseDouble(args[5]);
+//        this.A_input = Integer.parseInt(args[3]);
 
         // Read in the specified image
         original_image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
         // ADDED
         // create a processed image
-        processed_image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        this.scaled_width = Math.round((float)(width * this.Sw_input));
+        this.scaled_height = Math.round((float)(height * this.Sh_input));
+        processed_image = new BufferedImage(scaled_width, scaled_height, BufferedImage.TYPE_INT_RGB);
 
         readImageRGB(width, height, args[0]);
 
@@ -149,7 +157,6 @@ public class ImageDisplay {
         frame1.pack();
         frame1.setVisible(true);
 
-
         // show original image
         frame2 = new JFrame();
         GridBagLayout gLayout2 = new GridBagLayout();
@@ -177,6 +184,7 @@ public class ImageDisplay {
 
     private double[][] convert_to_YUV(byte[] rgb, int width,int height){
         double[][] yuv = new double[3][rgb.length/3];
+        System.out.println("original length " + rgb.length/3);
         int index = 0;
         for (int p = 0; p < height; p++) {
             for (int q = 0; q < width; q++) {
@@ -311,6 +319,25 @@ public class ImageDisplay {
         }
     }
 
+
+    private int[][] scale_RGB(int [][] given_RGB) {
+        int [][] scaled_RGB = new int [3][scaled_width * scaled_height];
+        // Sw_input and Sh_input are smaller than 1.0
+
+        int Sw_reverse =  Math.round((float)(1/Sw_input));
+        int Sh_reverse =  Math.round((float)(1/Sh_input));
+
+        for (int p = 0; p < scaled_height; p++){
+            for (int q = 0; q < scaled_width; q++){
+                int new_index = Math.round((float)p*scaled_width+q);
+                int original_index = Math.round((float)(p*Sw_reverse)*width + q*Sh_reverse);
+                scaled_RGB[0][new_index] = given_RGB[0][original_index];
+                scaled_RGB[1][new_index] = given_RGB[1][original_index];
+                scaled_RGB[2][new_index] = given_RGB[2][original_index];
+            }
+        }
+        return scaled_RGB;
+    }
 
     public static void main(String[] args) {
         ImageDisplay ren = new ImageDisplay();
