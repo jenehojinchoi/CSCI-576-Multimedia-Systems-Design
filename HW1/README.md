@@ -4,30 +4,9 @@
 
 ### Test Results
 
-1. Different YUV input
+See results in HW1/results.
 
-```
-java ImageDisplay ../images/miamibeach.rgb 1 10 10 1 1 0
-```
-
-| Original                                                                                                               | Processed                                                                                                                   |
-| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| ![](https://github.com/jenehojinchoi/CSCI-576-Multimedia-Systems-Design/tree/main/HW1/results/miamibeach_original.png) | ![](https://github.com/jenehojinchoi/CSCI-576-Multimedia-Systems-Design/tree/main/HW1/results/miamibeach_1_10_10_1_1_0.png) |
-
-2. Antialiasing
-
-```
-// No Antialiasing
-java ImageDisplay ../images/lake-forest_1920w_1080h.rgb 1 1 1 0.5 0.5 0
-// Yes Antialiasing
-java ImageDisplay ../images/lake-forest_1920w_1080h.rgb 1 1 1 0.5 0.5 1
-```
-
-The reason why there are white space around the images is because it is scaled down to (0.5*1920) x (0.5*1080.
-
-| No Antialiasing                                                                                                                | Antialiasing                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| ![](https://github.com/jenehojinchoi/CSCI-576-Multimedia-Systems-Design/tree/main/HW1/results/scaled_lake_no_antialiasing.png) | ![](https://github.com/jenehojinchoi/CSCI-576-Multimedia-Systems-Design/tree/main/HW1/results/scaled_lake_antialiasing.png) |
+For scaled_lake images: the reason why there are white space around the images is because they are scaled down to (0.5 x 1920) x (0.5 x 1080).
 
 #### Environment
 
