@@ -13,7 +13,8 @@ public class VideoDisplay {
    int width = 640; // default image width and height
    int height = 480;
 
-   private static int DELAY = 22; //42;
+   ArrayList<BufferedImage> frames;
+   private static int DELAY = 42;
 
    /** Read Image RGB
     *  Reads the image of given width and height at the given imgPath into the provided BufferedImage.
@@ -92,6 +93,8 @@ public class VideoDisplay {
       // Read videoFilePaths for foreground and background
       String foregroundVideoFilesPath = args[0];
       String backgroundVideoFilesPath = args[1];
+      String mode = args[2];
+      System.out.println(mode);
 
       // foreground, background files
       File foregroundVideoDirectory = new File(foregroundVideoFilesPath);
@@ -103,7 +106,7 @@ public class VideoDisplay {
       Arrays.sort(backgroundFileNames);
 
       int numFiles = foregroundFileNames.length;
-
+      frames = new ArrayList<BufferedImage>(numFiles);
       totalFrame = new JFrame();
       totalLabel = new JLabel();
 
@@ -122,15 +125,27 @@ public class VideoDisplay {
          BufferedImage tempImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
          readImageRGB(width, height, foregroundFamePath, backgroundFamePath, tempImage);
-
-         totalLabel.setIcon(new ImageIcon(tempImage));
-
+         frames.add(tempImage);
          i++;
+      }
+      runVideo(numFiles);
+   }
+
+   private void runVideo (int numFiles) {
+      int i = 0;
+      totalFrame.pack();
+      totalFrame.setVisible(true);
+
+      while (i < numFiles) {
+         BufferedImage tempFrame = frames.get(i);
+         totalLabel.setIcon(new ImageIcon(tempFrame));
+
          try {
             Thread.sleep(DELAY);
          } catch (InterruptedException e) {
             throw new RuntimeException(e);
          }
+         i++;
       }
    }
 
@@ -152,9 +167,6 @@ public class VideoDisplay {
       c.gridx = 0;
       c.gridy = 1;
       totalFrame.getContentPane().add(totalLabel, c);
-
-      totalFrame.pack();
-      totalFrame.setVisible(true);
    }
 
 
