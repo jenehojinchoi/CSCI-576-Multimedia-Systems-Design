@@ -1,0 +1,1 @@
+There should be directories that contain rgb files for videos.
