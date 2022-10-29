@@ -2,46 +2,37 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.Arrays;
-
 import javax.swing.*;
-
 import static java.lang.Math.cos;
 
 public class ImageCompression {
-   public static void main(String[] args) {
-      ImageCompression ren = new ImageCompression();
-      ren.processDWT(args);
-   }
-
-   private static int WIDTH = 512;
-   private static int HEIGHT = 512;
-   private static int MAX_PIXEL_VAL = 255;
-   private static int BLOCK_SIZE = 8;
+   private static int width = 512;
+   private static int height = 512;
    private static int BASE = 4096;
+   int totalNum;
+   BufferedImage originalImg = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
-   BufferedImage originalImg = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+   int[][] red = new int[height][width];
+   int[][] green = new int[height][width];
+   int[][] blue = new int[height][width];
 
-   int[][] red = new int[HEIGHT][WIDTH];
-   int[][] green = new int[HEIGHT][WIDTH];
-   int[][] blue = new int[HEIGHT][WIDTH];
+   BufferedImage DWTImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+   double[][] rDWT = new double[height][width];
+   double[][] gDWT = new double[height][width];
+   double[][] bDWT = new double[height][width];
 
-   BufferedImage DWTImage = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
-   double[][] rDWT = new double[HEIGHT][WIDTH];
-   double[][] gDWT = new double[HEIGHT][WIDTH];
-   double[][] bDWT = new double[HEIGHT][WIDTH];
-
-   int[][] rIDWT = new int[HEIGHT][WIDTH];
-   int[][] gIDWT = new int[HEIGHT][WIDTH];
-   int[][] bIDWT = new int[HEIGHT][WIDTH];
+   int[][] rIDWT = new int[height][width];
+   int[][] gIDWT = new int[height][width];
+   int[][] bIDWT = new int[height][width];
 
 
    JFrame imageFrame = new JFrame();
    GridBagLayout gridBagLayout = new GridBagLayout();
    JLabel JLabel = new JLabel();
    JLabel JLabelText = new JLabel();
-   static double[][] cosineBlockMatrix = new double[BLOCK_SIZE][BLOCK_SIZE];
+   static double[][] cosineMatrix = new double[8][8];
 
-   private void readImageRGB(File file, int coefficientNum) {
+   private void readImageRGB(File file) {
       try {
          InputStream inputStream = new FileInputStream(file);
 
@@ -53,17 +44,14 @@ public class ImageCompression {
          while (offset < bytes.length && (readCount = inputStream.read(bytes, offset, bytes.length - offset)) >= 0) {
             offset += readCount;
          }
-
-         for (int row = 0; row < BLOCK_SIZE; row++)
-            for (int column = 0; column < BLOCK_SIZE; column++)
-               cosineBlockMatrix[row][column] = cos((2 * row + 1) * column * 3.14159 / 16.00);
+         calculateCosineMatrix();
 
          int index = 0;
-         for (int row = 0; row < HEIGHT; row++) {
-            for (int column = 0; column < WIDTH; column++) {
+         for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
                int r = bytes[index];
-               int g = bytes[index + HEIGHT * WIDTH];
-               int b = bytes[index + HEIGHT * WIDTH * 2];
+               int g = bytes[index + height * width];
+               int b = bytes[index + height * width * 2];
 
                r = r & 0xFF;
                g = g & 0xFF;
@@ -86,76 +74,86 @@ public class ImageCompression {
          throw new RuntimeException(e);
       }
    }
-   public void processDWT(String[] args) {
 
+   private void calculateCosineMatrix() {
+      for (int r = 0; r < 8; r++)
+         for (int c = 0; c < 8; c++)
+            cosineMatrix[r][c] = cos((2*r+1) * c * Math.PI / 16.00);
+   }
+
+   /**
+    * @param matrix : Matrix A
+    * @return Transposed Matrix of A
+    */
+
+   private static double[][] transpose(double[][] matrix) {
+      double[][] temp = new double[height][width];
+      for (int r = 0; r < height; r++)
+         for (int c = 0; c < width; c++)
+            temp[r][c] = matrix[c][r];
+      return temp;
+   }
+
+   public void processDWT(String[] args) {
       try {
          File file = new File(args[0]);
-         int coefficientNum = Integer.parseInt(args[1]);
-         readImageRGB(file, coefficientNum);
+         int lowPassCoefficient = Integer.parseInt(args[1]);
+         readImageRGB(file);
 
-         if (coefficientNum >= 0) {
-            int totalNum = (int) Math.pow(2, coefficientNum*2);
-            System.out.println(totalNum);
-            int m = totalNum / BASE;
+         if (lowPassCoefficient >= 0) {
+            totalNum = (int) Math.pow(2, lowPassCoefficient*2);
 
-            rDWT = decomposeDWT(red, totalNum);
-            gDWT = decomposeDWT(green, totalNum);
-            bDWT = decomposeDWT(blue, totalNum);
+            rDWT = DWTDecomposition(red, totalNum);
+            gDWT = DWTDecomposition(green, totalNum);
+            bDWT = DWTDecomposition(blue, totalNum);
 
             rIDWT = IDWTComposition(rDWT);
             gIDWT = IDWTComposition(gDWT);
             bIDWT = IDWTComposition(bDWT);
-
             showRecoveredDWT(-1);
-         } else {
-            for (int idx = 0; idx < 10; idx ++) {
+         }
+         else {
+            for (int idx = 1; idx < 10; idx ++) {
                int level = idx;
-               int totalNum = (int) Math.pow(2, level *2);
-               int m = totalNum / BASE;
+               totalNum = (int) Math.pow(2, level *2);
 
-               rDWT = decomposeDWT(red, totalNum);
-               gDWT = decomposeDWT(green, totalNum);
-               bDWT = decomposeDWT(blue, totalNum);
+               rDWT = DWTDecomposition(red, totalNum);
+               gDWT = DWTDecomposition(green, totalNum);
+               bDWT = DWTDecomposition(blue, totalNum);
 
                rIDWT = IDWTComposition(rDWT);
                gIDWT = IDWTComposition(gDWT);
                bIDWT = IDWTComposition(bDWT);
 
                try {
-                  Thread.sleep(500);
+                  Thread.sleep(3000);
                } catch (InterruptedException e) {
                   e.printStackTrace();
                }
-
                showRecoveredDWT(idx);
             }
          }
-
       } catch (Exception e) {
          e.printStackTrace();
       }
    }
 
-
-   /**
-    * Show DWT transformed image for a level
-    * @param idx : number of level
-    */
    private void showRecoveredDWT(int idx) {
-      for (int row = 0; row < HEIGHT; row++) {
-         for (int column = 0; column < WIDTH; column++) {
-            int rr = rIDWT[row][column] & 0xff;
-            int gg = gIDWT[row][column] & 0xff;
-            int bb = bIDWT[row][column] & 0xff;
+      for (int r = 0; r < height; r++) {
+         for (int c = 0; c < width; c++) {
+            int rr = rIDWT[r][c] & 0xff;
+            int gg = gIDWT[r][c] & 0xff;
+            int bb = bIDWT[r][c] & 0xff;
 
             int pixValue = 0xff000000 | ((rr << 16) | ((gg << 8) | bb));
-            DWTImage.setRGB(column, row, pixValue);
+            DWTImage.setRGB(c, r, pixValue);
          }
       }
 
       imageFrame.getContentPane().setLayout(gridBagLayout);
 
-      JLabelText.setText(idx != -1 ? "DWT View (n : " + idx + "/9)" : "DWT View ");
+      int step = idx-1;
+      JLabelText.setText(idx != -1 ? "DWT View (Step: " + step + ")" : "DWT View ");
       JLabelText.setHorizontalAlignment(SwingConstants.CENTER);
       JLabel.setIcon(new ImageIcon(DWTImage));
 
@@ -176,40 +174,25 @@ public class ImageCompression {
       imageFrame.setVisible(true);
    }
 
-   /**
-    * @param matrix : Matrix A
-    * @return Transposed Matrix of A
-    */
+   private double[][] DWTDecomposition(int[][] matrix, int n) {
+      double[][] DWTMatrix = new double[height][width];
+      for (int r = 0; r < height; r++)
+         for (int c = 0; c < width; c++)
+            DWTMatrix[r][c] = matrix[r][c];
 
-   private static double[][] performMatrixTranspose(double[][] matrix) {
-      double[][] tempMat = new double[HEIGHT][WIDTH];
-      for (int row = 0; row < HEIGHT; row++)
-         for (int column = 0; column < WIDTH; column++)
-            tempMat[row][column] = matrix[column][row];
+      for (int r = 0; r < width; r++)
+         DWTMatrix[r] = getDecompositionArray(DWTMatrix[r]);
+      DWTMatrix = transpose(DWTMatrix);
 
-      return tempMat;
-   }
+      for (int c = 0; c < width; c++)
+         DWTMatrix[c] = getDecompositionArray(DWTMatrix[c]);
+      DWTMatrix = transpose(DWTMatrix);
 
-
-   private double[][] decomposeDWT(int[][] matrix, int n) {
-      double[][] DWTMatrix = new double[HEIGHT][WIDTH];
-
-      for (int row = 0; row < HEIGHT; row++)
-         for (int column = 0; column < WIDTH; column++)
-            DWTMatrix[row][column] = matrix[row][column];
-
-      for (int row = 0; row < WIDTH; row++)
-         DWTMatrix[row] = getDecompositionArray(DWTMatrix[row]);
-
-      DWTMatrix = performMatrixTranspose(DWTMatrix);
-      for (int col = 0; col < HEIGHT; col++)
-         DWTMatrix[col] = getDecompositionArray(DWTMatrix[col]);
-
-      DWTMatrix = performMatrixTranspose(DWTMatrix);
-      DWTMatrix = doZigZagTraversal(DWTMatrix, n);
+      DWTMatrix = zigZagTraversal(DWTMatrix, n);
 
       return DWTMatrix;
    }
+
 
    private double[] getDecompositionArray(double[] array) {
       int height = array.length;
@@ -220,44 +203,42 @@ public class ImageCompression {
       return array;
    }
 
-   /**
-    * @return Low and High Pass decomposition
-    */
-
    private double[] decompositionStep(double[] array, int height) {
-      double[] dArray = Arrays.copyOf(array, array.length);
-      for (int index = 0; index < height / 2; index++) {
-         dArray[index] = (array[2 * index] + array[2 * index + 1]) / 2;
-         dArray[height / 2 + index] = (array[2 * index] - array[2 * index + 1]) / 2;
+      double[] decomposedArray = Arrays.copyOf(array, array.length);
+      for (int i = 0; i < height / 2; i++) {
+         // low
+         decomposedArray[i] = (array[2*i] + array[2*i+1]) / 2;
+         // high
+         decomposedArray[height / 2 + i] = (array[2*i] - array[2*i+1]) / 2;
       }
-      return dArray;
+      return decomposedArray;
    }
 
 
-   /**
-    * Recreating the image after DWT operation
-    *
-    * @param matrix : DWT matrix
-    * @return : possible original image
-    */
-
    private static int[][] IDWTComposition(double[][] matrix) {
-      int[][] IDWTMatrix = new int[HEIGHT][WIDTH];
+      int[][] IDWTMatrix = new int[height][width];
 
-      matrix = performMatrixTranspose(matrix);
-      for (int row = 0; row < WIDTH; row++) {
-         matrix[row] = getCompositionArray(matrix[row]);
+      // all columns
+      matrix = transpose(matrix);
+      for (int r = 0; r < width; r++) {
+         matrix[r] = getCompositionArray(matrix[r]);
       }
 
-      matrix = performMatrixTranspose(matrix);
-      for (int col = 0; col < HEIGHT; col++) {
-         matrix[col] = getCompositionArray(matrix[col]);
+      // all rows
+      matrix = transpose(matrix);
+      for (int c = 0; c < height; c++) {
+         matrix[c] = getCompositionArray(matrix[c]);
       }
 
-      for (int row = 0; row < HEIGHT; row++) {
-         for (int column = 0; column < WIDTH; column++) {
-            IDWTMatrix[row][column] = (int) Math.round(matrix[row][column]);
-            IDWTMatrix[row][column] = IDWTMatrix[row][column] < 0 ? 0 : (IDWTMatrix[row][column] > MAX_PIXEL_VAL ? MAX_PIXEL_VAL : IDWTMatrix[row][column]);
+      for (int r = 0; r < height; r++) {
+         for (int c = 0; c < width; c++) {
+            IDWTMatrix[r][c] = (int) Math.round(matrix[r][c]);
+            if (IDWTMatrix[r][c] < 0) {
+               IDWTMatrix[r][c] = 0;
+            }
+            if (IDWTMatrix[r][c] > 255) {
+               IDWTMatrix[r][c] = 255;
+            }
          }
       }
       return IDWTMatrix;
@@ -273,91 +254,78 @@ public class ImageCompression {
    }
 
    private static double[] compositionStep(double[] array, int height) {
-      double[] dArray = Arrays.copyOf(array, array.length);
-      for (int index = 0; index < height / 2; index++) {
-         dArray[2 * index] = array[index] + array[height / 2 + index];
-         dArray[2 * index + 1] = array[index] - array[height / 2 + index];
+      double[] composedArray = Arrays.copyOf(array, array.length);
+      for (int i = 0; i < height / 2; i++) {
+         composedArray[2*i] = array[i] + array[height / 2 + i];
+         composedArray[2*i + 1] = array[i] - array[height / 2 + i];
       }
-      return dArray;
+      return composedArray;
    }
 
-
-   /**
-    * coefficient counting
-    *
-    * @param matrix : image matrix
-    * @param m      : n/4096
-    * @return : matrix after zig zag traversal
-    */
-
-   public double[][] doZigZagTraversal(double[][] matrix, int m) {
-      int row = 0;
-      int column = 0;
+   public double[][] zigZagTraversal(double[][] matrix, int m) {
+      int r = 0; int c = 0;
       int length = matrix.length - 1;
       int count = 1;
 
-      matrix[row][column] = count > m ? 0 : matrix[row][column];
+      matrix[r][c] = count > m ? 0 : matrix[r][c];
       count++;
 
       while (true) {
-
-         column++;
-         matrix[row][column] = count > m ? 0 : matrix[row][column];
+         c++;
+         matrix[r][c] = count > m ? 0 : matrix[r][c];
          count++;
-
-         while (column != 0) {
-            row++;
-            column--;
-            matrix[row][column] = count > m ? 0 : matrix[row][column];
+         while (c != 0) {
+            r++;
+            c--;
+            matrix[r][c] = count > m ? 0 : matrix[r][c];
             count++;
          }
-         row++;
-         if (row > length) {
-            row--;
+         r++;
+         if (r > length) {
+            r--;
             break;
          }
-
-         matrix[row][column] = count > m ? 0 : matrix[row][column];
+         matrix[r][c] = count > m ? 0 : matrix[r][c];
          count++;
-
-         while (row != 0) {
-            row--;
-            column++;
-            matrix[row][column] = count > m ? 0 : matrix[row][column];
+         while (r != 0) {
+            r--;
+            c++;
+            matrix[r][c] = count > m ? 0 : matrix[r][c];
             count++;
          }
       }
 
       while (true) {
-         column++;
+         c++;
          count++;
-
          if (count > m) {
-            matrix[row][column] = 0;
+            matrix[r][c] = 0;
          }
-
-         while (column != length) {
-            column++;
-            row--;
-            matrix[row][column] = count > m ? 0 : matrix[row][column];
+         while (c != length) {
+            c++;
+            r--;
+            matrix[r][c] = count > m ? 0 : matrix[r][c];
             count++;
          }
-
-         row++;
-         if (row > length) {
-            row--;
+         r++;
+         if (r > length) {
+            r--;
             break;
          }
-         matrix[row][column] = count > m ? 0 : matrix[row][column];
+         matrix[r][c] = count > m ? 0 : matrix[r][c];
          count++;
-
-         while (row < length) {
-            row++;
-            column--;
-            matrix[row][column] = count > m ? 0 : matrix[row][column];
+         while (r < length) {
+            r++;
+            c--;
+            matrix[r][c] = count > m ? 0 : matrix[r][c];
             count++;
          }
       }
       return matrix;
+   }
+
+   public static void main(String[] args) {
+      ImageCompression imageCompress = new ImageCompression();
+      imageCompress.processDWT(args);
    }
 }
